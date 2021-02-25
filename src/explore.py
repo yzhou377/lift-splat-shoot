@@ -157,6 +157,7 @@ def cumsum_check(version,
                                           parser_name='segmentationdata')
 
     device = torch.device('cpu') if gpuid < 0 else torch.device(f'cuda:{gpuid}')
+    
     loader = trainloader
 
     model = compile_model(grid_conf, data_aug_conf, outC=1)
@@ -194,7 +195,7 @@ def cumsum_check(version,
 def eval_model_iou(version,
                 modelf,
                 dataroot='/data/nuscenes',
-                gpuid=1,
+                gpuid=0,
 
                 H=900, W=1600,
                 resize_lim=(0.193, 0.225),
@@ -232,8 +233,8 @@ def eval_model_iou(version,
                                           grid_conf=grid_conf, bsz=bsz, nworkers=nworkers,
                                           parser_name='segmentationdata')
 
+    print(gpuid)
     device = torch.device('cpu') if gpuid < 0 else torch.device(f'cuda:{gpuid}')
-
     model = compile_model(grid_conf, data_aug_conf, outC=1)
     print('loading', modelf)
     model.load_state_dict(torch.load(modelf))

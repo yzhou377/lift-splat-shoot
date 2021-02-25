@@ -234,7 +234,11 @@ def get_batch_iou(preds, binimgs):
     """
     with torch.no_grad():
         pred = (preds > 0)
-        tgt = binimgs.bool()
+
+        #tgt = binimgs.bool() #ORIGINAL
+        # PyTorch >1.3 Compatibility Issue, YZ DEBUG
+        tgt= (binimgs>0.5)
+        
         intersect = (pred & tgt).sum().float().item()
         union = (pred | tgt).sum().float().item()
     return intersect, union, intersect / union if (union > 0) else 1.0
