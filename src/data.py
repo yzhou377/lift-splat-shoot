@@ -17,6 +17,10 @@ from glob import glob
 
 from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx
 
+class CarlaData(torch.utils.data.Dataset):
+    def __init__(self,nusc,is_trrain,data_aug_conf, grid_conf):
+        print("EMPTY")
+
 
 class NuscData(torch.utils.data.Dataset):
     def __init__(self, nusc, is_train, data_aug_conf, grid_conf):

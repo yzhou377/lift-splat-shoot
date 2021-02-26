@@ -3,14 +3,20 @@ Copyright (C) 2020 NVIDIA Corporation.  All rights reserved.
 Licensed under the NVIDIA Source Code License. See LICENSE at https://github.com/nv-tlabs/lift-splat-shoot.
 Authors: Jonah Philion and Sanja Fidler
 """
+# The writing of this file with it's relative path making it impossible to run it. You have to run something at the "/lift-splat-shoot" level. 
+
 
 import torch
 import matplotlib as mpl
-mpl.use('Agg')
+mpl.use('Agg') # This specifies that matplotlib only renders to PNG files
 import matplotlib.pyplot as plt
-from PIL import Image
-import matplotlib.patches as mpatches
+from PIL import Image # Python image library 
+import matplotlib.patches as mpatches # Patch plots, color blob 
 
+
+# Using .data means to import from this folder 
+# The name of this explore module is src.explore, so one dot is to return to src 
+# As a result, you can also directly write "import src_tutorial.tutorial_nn"
 from .data import compile_data
 from .tools import (ego_to_cam, get_only_in_img_mask, denormalize_img,
                     SimpleLoss, get_val_info, add_ego, gen_dx_bx,
@@ -135,6 +141,19 @@ def cumsum_check(version,
                 bsz=4,
                 nworkers=10,
                 ):
+    """
+    There are several hyper-parameters that determine the “resolution” of our
+    model. First, there is the size of the input images H × W. In all experiments
+    below, we resize and crop input images to size 128 × 352 and adjust extrinsics
+    and intrinsics accordingly. Another important hyperparameter of network is the
+    size the resolution of the bird’s-eye-view grid X × Y . In our experiments, we set
+    bins in both x and y from -50 meters to 50 meters with cells of size 0.5 meters ×
+    0.5 meters. The resultant grid is therefore 200×200 [xbound etc.]. Finally, there’s the choice of
+    D that determines the resolution of depth predicted by the network. We restrict
+    D between 4.0 meters and 45.0 meters spaced by 1.0 meters [could this be finer?]. With these hyperparameters
+    and architectural design choices, the forward pass of the model runs
+    at 35 hz on a Titan V GPU.
+    """
     grid_conf = {
         'xbound': xbound,
         'ybound': ybound,
