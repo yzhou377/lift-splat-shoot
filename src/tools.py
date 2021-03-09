@@ -181,7 +181,9 @@ def gen_dx_bx(xbound, ybound, zbound):
 
 def cumsum_trick(x, geom_feats, ranks):
     x = x.cumsum(0)
-    kept = torch.ones(x.shape[0], device=x.device, dtype=torch.bool)
+    # YZ DEBUG, caused by updated pytorch version 
+    # Original: kept = torch.ones(x.shape[0], device=x.device, dtype=torch.bool)
+    kept = torch.ones(x.shape[0], device=x.device, dtype=torch.uint8)
     kept[:-1] = (ranks[1:] != ranks[:-1])
 
     x, geom_feats = x[kept], geom_feats[kept]
@@ -194,7 +196,9 @@ class QuickCumsum(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, geom_feats, ranks):
         x = x.cumsum(0)
-        kept = torch.ones(x.shape[0], device=x.device, dtype=torch.bool)
+        # YZ DEBUG, caused by updated pytorch version 
+        # Original: kept = torch.ones(x.shape[0], device=x.device, dtype=torch.bool)
+        kept = torch.ones(x.shape[0], device=x.device, dtype=torch.uint8)
         kept[:-1] = (ranks[1:] != ranks[:-1])
 
         x, geom_feats = x[kept], geom_feats[kept]

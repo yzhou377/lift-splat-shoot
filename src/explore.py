@@ -124,22 +124,22 @@ def lidar_check(version,
 
 def cumsum_check(version,
                 dataroot='/data/nuscenes',
-                gpuid=1,
+                gpuid=0,
 
-                H=900, W=1600,
-                resize_lim=(0.193, 0.225),
-                final_dim=(128, 352),
-                bot_pct_lim=(0.0, 0.22),
-                rot_lim=(-5.4, 5.4),
-                rand_flip=True,
+                H=900, W=1600, # The original input image size
+                resize_lim=(0.193, 0.225), # ???
+                final_dim=(128, 352), # The final image size 
+                bot_pct_lim=(0.0, 0.22), # ????
+                rot_lim=(-5.4, 5.4), # ??? 
+                rand_flip=True, # ??? 
 
-                xbound=[-50.0, 50.0, 0.5],
+                xbound=[-50.0, 50.0, 0.5], # The lift parrameters
                 ybound=[-50.0, 50.0, 0.5],
                 zbound=[-10.0, 10.0, 20.0],
                 dbound=[4.0, 45.0, 1.0],
 
-                bsz=4,
-                nworkers=10,
+                bsz=4, # ??? 
+                nworkers=10, # ???? 
                 ):
     """
     There are several hyper-parameters that determine the “resolution” of our
@@ -150,8 +150,8 @@ def cumsum_check(version,
     bins in both x and y from -50 meters to 50 meters with cells of size 0.5 meters ×
     0.5 meters. The resultant grid is therefore 200×200 [xbound etc.]. Finally, there’s the choice of
     D that determines the resolution of depth predicted by the network. We restrict
-    D between 4.0 meters and 45.0 meters spaced by 1.0 meters [could this be finer?]. With these hyperparameters
-    and architectural design choices, the forward pass of the model runs
+    D between 4.0 meters and 45.0 meters spaced by 1.0 meters [could this be finer?]. 
+    With these hyperparameters and architectural design choices, the forward pass of the model runs
     at 35 hz on a Titan V GPU.
     """
     grid_conf = {

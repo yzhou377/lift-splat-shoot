@@ -17,10 +17,6 @@ from glob import glob
 
 from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx
 
-class CarlaData(torch.utils.data.Dataset):
-    def __init__(self,nusc,is_trrain,data_aug_conf, grid_conf):
-        print("EMPTY")
-
 
 class NuscData(torch.utils.data.Dataset):
     def __init__(self, nusc, is_train, data_aug_conf, grid_conf):
@@ -82,7 +78,6 @@ class NuscData(torch.utils.data.Dataset):
         }[self.nusc.version][self.is_train]
 
         scenes = create_splits_scenes()[split]
-
         return scenes
 
     def prepro(self):
@@ -94,7 +89,10 @@ class NuscData(torch.utils.data.Dataset):
 
         # sort by scene, timestamp (only to make chronological viz easier)
         samples.sort(key=lambda x: (x['scene_token'], x['timestamp']))
-
+        print("samples_in")
+        print(len(samples))
+        print("samples_end")
+        print(samples[0])
         return samples
     
     def sample_augmentation(self):
@@ -157,7 +155,7 @@ class NuscData(torch.utils.data.Dataset):
             post_tran[:2] = post_tran2
             post_rot[:2, :2] = post_rot2
 
-            imgs.append(normalize_img(img))
+            imgs.append(normalize_img(img)) 
             intrins.append(intrin)
             rots.append(rot)
             trans.append(tran)
@@ -213,6 +211,7 @@ class NuscData(torch.utils.data.Dataset):
 
 
 class VizData(NuscData):
+    # For visualization only 
     def __init__(self, *args, **kwargs):
         super(VizData, self).__init__(*args, **kwargs)
     
@@ -221,13 +220,14 @@ class VizData(NuscData):
         
         cams = self.choose_cams()
         imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
-        lidar_data = self.get_lidar_data(rec, nsweeps=3)
+        lidar_data = self.get_lidar_data(rec, nsweeps=3) # Difference is adding the lidar here. 
         binimg = self.get_binimg(rec)
         
         return imgs, rots, trans, intrins, post_rots, post_trans, lidar_data, binimg
 
 
 class SegmentationData(NuscData):
+    # For training and evaluation 
     def __init__(self, *args, **kwargs):
         super(SegmentationData, self).__init__(*args, **kwargs)
     
@@ -241,31 +241,106 @@ class SegmentationData(NuscData):
         return imgs, rots, trans, intrins, post_rots, post_trans, binimg
 
 
+
+
+
+
+
+
+class CarlaData(torch.utils.data.Dataset):
+    def __init__(self, dataroot, is_train, data_aug_conf, grid_conf):
+        self.is_train = is_train
+        self.data_aug_conf = data_aug_conf
+        self.grid_conf = grid_conf
+        self.dataroot= dataroot
+
+        self.ixes= self.prepro()
+
+        dx, bx, nx = gen_dx_bx(grid_conf['xbound'], grid_conf['ybound'], grid_conf['zbound'])
+        self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
+
+    def prepro():
+
+
+    def get_image_data():
+
+    def get_binimg():
+
+    def choose_cams()
+    
+    def __getitem__(self, index):
+        rec = self.ixes[index]
+
+        cams = self.choose_cams()
+        imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
+        binimg = self.get_binimg(rec)
+        
+        return imgs, rots, trans, intrins, post_rots, post_trans, binimg
+
+
+
+    def __init__(self, nusc, is_train, data_aug_conf, grid_conf):
+        self.scenes = self.get_scenes()
+        self.ixes = self.prepro()
+
+        dx, bx, nx = gen_dx_bx(grid_conf['xbound'], grid_conf['ybound'], grid_conf['zbound'])
+        self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
+
+        self.fix_nuscenes_formatting()
+
+        print(self)
+
+
+
+
 def worker_rnd_init(x):
     np.random.seed(13 + x)
 
 
+
+
+
+
+
+
 def compile_data(version, dataroot, data_aug_conf, grid_conf, bsz,
                  nworkers, parser_name):
-    nusc = NuScenes(version='v1.0-{}'.format(version),
-                    dataroot=os.path.join(dataroot, version),
-                    verbose=False)
-    parser = {
-        'vizdata': VizData,
-        'segmentationdata': SegmentationData,
-    }[parser_name]
-    traindata = parser(nusc, is_train=True, data_aug_conf=data_aug_conf,
-                         grid_conf=grid_conf)
-    valdata = parser(nusc, is_train=False, data_aug_conf=data_aug_conf,
-                       grid_conf=grid_conf)
 
-    trainloader = torch.utils.data.DataLoader(traindata, batch_size=bsz,
-                                              shuffle=True,
-                                              num_workers=nworkers,
-                                              drop_last=True,
-                                              worker_init_fn=worker_rnd_init)
-    valloader = torch.utils.data.DataLoader(valdata, batch_size=bsz,
-                                            shuffle=False,
-                                            num_workers=nworkers)
+    if version=="CARLA":
+        traindata= CarlaData(version=version, dataroot, is_train=True, data_aug_conf= data_aug_conf,
+                            grid_conf= grid_conf)
+        valdata= CarlaData(dataroot, is_train=False, data_aug_conf= data_aug_conf,
+                            grid_conf= grid_conf)
+        
+        trainloader = torch.utils.data.DataLoader(traindata, batch_size=bsz,
+                                                shuffle=True,
+                                                num_workers=nworkers,
+                                                drop_last=True,
+                                                worker_init_fn=worker_rnd_init)
+        valloader = torch.utils.data.DataLoader(valdata, batch_size=bsz,
+                                                shuffle=False,
+                                                num_workers=nworkers)
+
+    else:
+        nusc = NuScenes(version='v1.0-{}'.format(version),
+                        dataroot=os.path.join(dataroot, version),
+                        verbose=False)
+        parser = {
+            'vizdata': VizData,
+            'segmentationdata': SegmentationData,
+        }[parser_name]
+        traindata = parser(nusc, is_train=True, data_aug_conf=data_aug_conf,
+                            grid_conf=grid_conf)
+        valdata = parser(nusc, is_train=False, data_aug_conf=data_aug_conf,
+                        grid_conf=grid_conf)
+
+        trainloader = torch.utils.data.DataLoader(traindata, batch_size=bsz,
+                                                shuffle=True,
+                                                num_workers=nworkers,
+                                                drop_last=True,
+                                                worker_init_fn=worker_rnd_init)
+        valloader = torch.utils.data.DataLoader(valdata, batch_size=bsz,
+                                                shuffle=False,
+                                                num_workers=nworkers)
 
     return trainloader, valloader
