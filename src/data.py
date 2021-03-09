@@ -260,15 +260,70 @@ class CarlaData(torch.utils.data.Dataset):
         self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
 
     def prepro():
+        """
+        Return a list of all scenes, each scene is a dictionary with 'label' and 'inputs' for 6 cameras
+        Incomplete data are elimited here.  
+        DONE:scenes are incomplete on Mar.08, from Takeda in email. YZ. 
+        """
+        data_summary=[]
+        for folder in sorted(glob.glob(os.path.join(self.dataroot, '0000*'))):
+            label_files=(glob.glob(os.path.join(folder, 'bev_path_*')))
+            for label_file in label_files:
+                in_folder_index= label_file([-10:-4])
+                inputs_file_names = [os.path.join(folder,"rgb_{}_{}.jpg".format(cam, in_folder_index)) for cam in self.data_aug_conf['cams']] 
+                if all(item in folder for item in inputs_file_names):
+                    data_summary.append({'label': label_file, 'inputs': inputs_file_names})
+        return data_summary
+
+
+    def get_intrinsic(self,cam):
+        """
+        Return intrinsic matrix of shape 
+        Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
+        Format confirmed to be in alignment with NuScenes
+        """
+        for intrinsic_filename in glob.glob(os.path.join(self.dataroot,'calibration/intrinsic*')):
+            if cam + '.txt' in intrinsic)filename:
+                intrinsic= np.loadtxt(intrinsic_filename)
+                return torch.Tensor(intrinsic)
+
+
+    def get_extrinsic(self,cam):
+        """
+        Return rotation of shape (3,3) and translatin of shape (3) in tensor format
+
+        Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
+        Format confirmed to be in alignment with NuScenes
+        """
+        for extrinsic_filename in extrinsic_list= glob.glob(os.path.join(self.dataroot,'calibration/extrinsic*')):
+            if cam + '.txt' in extrinsic_filename:
+                extrinsic= np.loadtxt(extrinsic_filename)
+                rot= torch.Tensor(extrinsic[0:3,0:3])
+                tran = torch.Tensor(extrinsic[0:3,3])
+                break 
+        return rot, tran 
 
 
     def get_image_data():
+        """
+        Return the image normalized by tools.normalize
+        """
+
 
     def get_binimg():
+        """
+        Return the groundtruth map in grid sizes 
+        """
 
-    def choose_cams()
+    def choose_cams():
+        """
+        Choose cams if we choose camera drop off. 
+        """
     
     def __getitem__(self, index):
+        """
+        The main function to get all the information setup for training or validation 
+        """
         rec = self.ixes[index]
 
         cams = self.choose_cams()
@@ -277,18 +332,6 @@ class CarlaData(torch.utils.data.Dataset):
         
         return imgs, rots, trans, intrins, post_rots, post_trans, binimg
 
-
-
-    def __init__(self, nusc, is_train, data_aug_conf, grid_conf):
-        self.scenes = self.get_scenes()
-        self.ixes = self.prepro()
-
-        dx, bx, nx = gen_dx_bx(grid_conf['xbound'], grid_conf['ybound'], grid_conf['zbound'])
-        self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
-
-        self.fix_nuscenes_formatting()
-
-        print(self)
 
 
 
@@ -307,7 +350,7 @@ def compile_data(version, dataroot, data_aug_conf, grid_conf, bsz,
                  nworkers, parser_name):
 
     if version=="CARLA":
-        traindata= CarlaData(version=version, dataroot, is_train=True, data_aug_conf= data_aug_conf,
+        traindata= CarlaData(version=version, dataroot=dataroot, is_train=True, data_aug_conf= data_aug_conf,
                             grid_conf= grid_conf)
         valdata= CarlaData(dataroot, is_train=False, data_aug_conf= data_aug_conf,
                             grid_conf= grid_conf)

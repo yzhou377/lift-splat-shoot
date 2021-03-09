@@ -48,7 +48,7 @@ def train(version,
             ):
 
     # Differentiating between the CARLA trainer and the Nuscenes trainer here. 
-    if version=='CARLA':
+    if version=="CARLA":
         grin_conf = {
             'xbound': xbound,
             'ybound': ybound,
@@ -62,8 +62,8 @@ def train(version,
                         'H': H, 'W': W,
                         'rand_flip': rand_flip,
                         'bot_pct_lim': bot_pct_lim,
-                        'cams': ['CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT',
-                                'CAM_BACK_LEFT', 'CAM_BACK', 'CAM_BACK_RIGHT'],
+                        'cams': ['front_right', 'front', 'front_left',
+                                'rear_left', 'rear', 'rear_right'],
                         'Ncams': ncams,
         }   
         # Here is the CARLA data compilation part
