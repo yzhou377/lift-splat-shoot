@@ -172,8 +172,11 @@ normalize_img = torchvision.transforms.Compose((
 
 
 def gen_dx_bx(xbound, ybound, zbound):
+    # dx is the grid size
     dx = torch.Tensor([row[2] for row in [xbound, ybound, zbound]])
+    # bx is the smallest boundary 
     bx = torch.Tensor([row[0] + row[2]/2.0 for row in [xbound, ybound, zbound]])
+    # this is the number of grids in x y and z 
     nx = torch.LongTensor([(row[1] - row[0]) / row[2] for row in [xbound, ybound, zbound]])
 
     return dx, bx, nx

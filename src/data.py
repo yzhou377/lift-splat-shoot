@@ -191,7 +191,6 @@ class NuscData(torch.utils.data.Dataset):
                 ).astype(np.int32)
             pts[:, [1, 0]] = pts[:, [0, 1]]
             cv2.fillPoly(img, [pts], 1.0)
-
         return torch.Tensor(img).unsqueeze(0)
 
     def choose_cams(self):
@@ -233,7 +232,8 @@ class SegmentationData(NuscData):
     
     def __getitem__(self, index):
         rec = self.ixes[index]
-
+        print("rec is here")
+        print(rec)
         cams = self.choose_cams()
         imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
@@ -249,32 +249,70 @@ class SegmentationData(NuscData):
 
 class CarlaData(torch.utils.data.Dataset):
     def __init__(self, dataroot, is_train, data_aug_conf, grid_conf):
+        # inheriting the parent class of dataset 
+        
+        
         self.is_train = is_train
         self.data_aug_conf = data_aug_conf
         self.grid_conf = grid_conf
         self.dataroot= dataroot
 
+        # Returns a summary of all scenes with splits
         self.ixes= self.prepro()
-
+        # Returns the grid size
         dx, bx, nx = gen_dx_bx(grid_conf['xbound'], grid_conf['ybound'], grid_conf['zbound'])
         self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
+        torch.utils.data.Dataset.__init__(dataroot, is_train, data_aug_conf, grid_conf)
 
-    def prepro():
+
+    def prepro(self):
         """
         Return a list of all scenes, each scene is a dictionary with 'label' and 'inputs' for 6 cameras
         Incomplete data are elimited here.  
-        DONE:scenes are incomplete on Mar.08, from Takeda in email. YZ. 
+        DONE: scenes are incomplete on Mar.08, from Takeda in email. YZ. 
         """
         data_summary=[]
-        for folder in sorted(glob.glob(os.path.join(self.dataroot, '0000*'))):
-            label_files=(glob.glob(os.path.join(folder, 'bev_path_*')))
+        if self.is_train:
+            start_folder=0
+            end_folder=30
+        else:
+            start_folder=30
+            end_folder=50
+
+        for folder in sorted(glob(os.path.join(self.dataroot, '0000*')))[start_folder:end_folder]:
+            label_files=glob(os.path.join(folder, 'bev_path_*'))
+            bev_files= glob(os.path.join(folder, 'rgb_*'))
             for label_file in label_files:
-                in_folder_index= label_file([-10:-4])
+                in_folder_index= label_file[-10:-4]
                 inputs_file_names = [os.path.join(folder,"rgb_{}_{}.jpg".format(cam, in_folder_index)) for cam in self.data_aug_conf['cams']] 
-                if all(item in folder for item in inputs_file_names):
-                    data_summary.append({'label': label_file, 'inputs': inputs_file_names})
+                if all(item in bev_files for item in inputs_file_names):
+                    data_summary.append({'label': label_file, 'folder': folder, 'in_folder_index': in_folder_index})
         return data_summary
 
+    def sample_augmentation(self):
+        H, W = self.data_aug_conf['H'], self.data_aug_conf['W']
+        fH, fW = self.data_aug_conf['final_dim']
+        if self.is_train:
+            resize = np.random.uniform(*self.data_aug_conf['resize_lim'])
+            resize_dims = (int(W*resize), int(H*resize))
+            newW, newH = resize_dims
+            crop_h = int((1 - np.random.uniform(*self.data_aug_conf['bot_pct_lim']))*newH) - fH
+            crop_w = int(np.random.uniform(0, max(0, newW - fW)))
+            crop = (crop_w, crop_h, crop_w + fW, crop_h + fH)
+            flip = False
+            if self.data_aug_conf['rand_flip'] and np.random.choice([0, 1]):
+                flip = True
+            rotate = np.random.uniform(*self.data_aug_conf['rot_lim'])
+        else:
+            resize = max(fH/H, fW/W)
+            resize_dims = (int(W*resize), int(H*resize))
+            newW, newH = resize_dims
+            crop_h = int((1 - np.mean(self.data_aug_conf['bot_pct_lim']))*newH) - fH
+            crop_w = int(max(0, newW - fW) / 2)
+            crop = (crop_w, crop_h, crop_w + fW, crop_h + fH)
+            flip = False
+            rotate = 0
+        return resize, resize_dims, crop, flip, rotate
 
     def get_intrinsic(self,cam):
         """
@@ -282,8 +320,8 @@ class CarlaData(torch.utils.data.Dataset):
         Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
         Format confirmed to be in alignment with NuScenes
         """
-        for intrinsic_filename in glob.glob(os.path.join(self.dataroot,'calibration/intrinsic*')):
-            if cam + '.txt' in intrinsic)filename:
+        for intrinsic_filename in glob(os.path.join(self.dataroot,'calibration/intrinsic*')):
+            if cam + '.txt' in intrinsic_filename:
                 intrinsic= np.loadtxt(intrinsic_filename)
                 return torch.Tensor(intrinsic)
 
@@ -295,7 +333,7 @@ class CarlaData(torch.utils.data.Dataset):
         Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
         Format confirmed to be in alignment with NuScenes
         """
-        for extrinsic_filename in extrinsic_list= glob.glob(os.path.join(self.dataroot,'calibration/extrinsic*')):
+        for extrinsic_filename in glob(os.path.join(self.dataroot,'calibration/extrinsic*')):
             if cam + '.txt' in extrinsic_filename:
                 extrinsic= np.loadtxt(extrinsic_filename)
                 rot= torch.Tensor(extrinsic[0:3,0:3])
@@ -304,55 +342,101 @@ class CarlaData(torch.utils.data.Dataset):
         return rot, tran 
 
 
-    def get_image_data():
+    def get_image_data(self, rec, cams):
         """
         Return the image normalized by tools.normalize
         """
+        imgs = []
+        rots = []
+        trans = []
+        intrins = []
+        post_rots = []
+        post_trans = []
+        for cam in cams:
+            imgname = os.path.join(rec['folder'], "rgb_{}_{}.jpg".format(cam, rec['in_folder_index']))
+            img = Image.open(imgname)
+            post_rot = torch.eye(2)
+            post_tran = torch.zeros(2)
+
+            intrin = self.get_intrinsic(cam)
+            rot, tran = self.get_extrinsic(cam)
+
+            # augmentation (resize, crop, horizontal flip, rotate)
+            resize, resize_dims, crop, flip, rotate = self.sample_augmentation()
+            img, post_rot2, post_tran2 = img_transform(img, post_rot, post_tran,
+                                                     resize=resize,
+                                                     resize_dims=resize_dims,
+                                                     crop=crop,
+                                                     flip=flip,
+                                                     rotate=rotate,
+                                                     )
+            
+            # for convenience, make augmentation matrices 3x3
+            post_tran = torch.zeros(3)
+            post_rot = torch.eye(3)
+            post_tran[:2] = post_tran2
+            post_rot[:2, :2] = post_rot2
+
+            imgs.append(normalize_img(img)) 
+            intrins.append(intrin)
+            rots.append(rot)
+            trans.append(tran)
+            post_rots.append(post_rot)
+            post_trans.append(post_tran)
+
+        return (torch.stack(imgs), torch.stack(rots), torch.stack(trans),
+                torch.stack(intrins), torch.stack(post_rots), torch.stack(post_trans))
 
 
-    def get_binimg():
+    def get_binimg(self, rec):
         """
         Return the groundtruth map in grid sizes 
         """
+        label_file_path= rec['label']
+        img = Image.open(label_file_path).convert('L')
+        img = img.resize((self.nx[0],self.nx[0]))
+        img_np= np.array(img)>0
+        return torch.Tensor(img_np).unsqueeze(0)
 
-    def choose_cams():
+
+    def choose_cams(self):
         """
-        Choose cams if we choose camera drop off. 
+        Choose cams if we choose camera drop off, only during training we choose to drop. 
         """
-    
+        if self.is_train and self.data_aug_conf['Ncams'] < len(self.data_aug_conf['cams']):
+            cams = np.random.choice(self.data_aug_conf['cams'], self.data_aug_conf['Ncams'],
+                                    replace=False)
+        else:
+            cams = self.data_aug_conf['cams']
+        return cams
+
+
     def __getitem__(self, index):
         """
         The main function to get all the information setup for training or validation 
         """
         rec = self.ixes[index]
-
+        
         cams = self.choose_cams()
         imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
         
         return imgs, rots, trans, intrins, post_rots, post_trans, binimg
 
-
-
-
+    def __len__(self):
+        return len(self.ixes)
 
 def worker_rnd_init(x):
     np.random.seed(13 + x)
-
-
-
-
-
-
 
 
 def compile_data(version, dataroot, data_aug_conf, grid_conf, bsz,
                  nworkers, parser_name):
 
     if version=="CARLA":
-        traindata= CarlaData(version=version, dataroot=dataroot, is_train=True, data_aug_conf= data_aug_conf,
+        traindata= CarlaData(dataroot= dataroot, is_train=True, data_aug_conf= data_aug_conf,
                             grid_conf= grid_conf)
-        valdata= CarlaData(dataroot, is_train=False, data_aug_conf= data_aug_conf,
+        valdata= CarlaData(dataroot= dataroot, is_train=False, data_aug_conf= data_aug_conf,
                             grid_conf= grid_conf)
         
         trainloader = torch.utils.data.DataLoader(traindata, batch_size=bsz,
