@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from nuscenes.utils.data_classes import LidarPointCloud
 from nuscenes.utils.geometry_utils import transform_matrix
 from nuscenes.map_expansion.map_api import NuScenesMap
-
+import matplotlib.pyplot as plt
 
 def get_lidar_data(nusc, sample_rec, nsweeps, min_distance):
     """
@@ -170,6 +170,9 @@ normalize_img = torchvision.transforms.Compose((
                                  std=[0.229, 0.224, 0.225]),
 ))
 
+process_orig_img = torchvision.transforms.Compose((
+                torchvision.transforms.ToTensor(),
+))
 
 def gen_dx_bx(xbound, ybound, zbound):
     # dx is the grid size
@@ -381,3 +384,49 @@ def get_local_map(nmap, center, stretch, layer_names, line_names):
             polys[layer_name][rowi] = np.dot(polys[layer_name][rowi], rot)
 
     return polys
+
+def matplotlib_imshow(img, one_channel=False):
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5     # unnormalize
+    npimg = img.numpy()
+    if one_channel:
+        plt.imshow(npimg, cmap="Greys")
+    else:
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+
+
+def downsize(img,rate):
+    img = img.resize((int(img.size[0]*rate),int(img.size[1]*rate)),Image.ANTIALIAS)
+    return  img
+
+def tensorboard_visualiza(model, writer, dataloader, is_train, device):
+    sampeld_image_data= iter(dataloader)
+    orig_imgs_display, imgs, rots, trans, intrins, post_rots, post_trans, binimgs_display = sampeld_image_data.next()
+
+    # Display the input image set 
+    first_image_set= list(torch.unbind(orig_imgs_display[0]))
+    img_grid= torchvision.utils.make_grid(tensor= first_image_set, nrow=int(len(first_image_set)/2))
+    if is_train:
+        writer.add_image('train_input', img_grid)
+    else: 
+        writer.add_image('val_input',img_grid)
+
+    # Display the GT label:
+    first_label= list(torch.unbind(binimgs_display[0]))
+    img_grid_gt= torchvision.utils.make_grid(first_label)
+    if is_train:
+        writer.add_image('train_gt', img_grid_gt)
+    else: 
+        writer.add_image('val_gt',img_grid_gt)
+
+    # Display the prediction label 
+    preds = model(imgs.to(device), rots.to(device),
+                          trans.to(device), intrins.to(device), post_rots.to(device),
+                          post_trans.to(device))
+    first_pred_set= list(torch.unbind(preds[0]))
+    img_grid_pred= torchvision.utils.make_grid(first_pred_set)
+    if is_train:
+        writer.add_image('train_pred', img_grid_pred)
+    else: 
+        writer.add_image('val_pred',img_grid_pred)

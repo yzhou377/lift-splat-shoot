@@ -13,7 +13,7 @@ import os
 
 from .models import compile_model
 from .data import compile_data
-from .tools import SimpleLoss, get_batch_iou, get_val_info
+from .tools import SimpleLoss, get_batch_iou, get_val_info, tensorboard_visualiza
 
 
 #YZ IMPORT 
@@ -63,7 +63,7 @@ def train(version,
                         'H': H, 'W': W,
                         'rand_flip': rand_flip,
                         'bot_pct_lim': bot_pct_lim,
-                        'cams': ['front_right', 'front', 'front_left',
+                        'cams': ['front_left', 'front', 'front_right',
                                 'rear_left', 'rear', 'rear_right'],
                         'Ncams': ncams,
         }   
@@ -147,11 +147,7 @@ def train(version,
                 writer.add_scalar('train/loss', loss, counter)
                 # Adding the tensorboard image display
                 sampeld_image_data= iter(trainloader)
-                orig_imgs_display, _, _, _, _, _, _, binimgs_display = sampeld_image_data.next()
-                first_image_set= list(torch.unbind(orig_imgs_display[0]))
-                img_grid= torchvision.utils.make_grid(first_image_set)
-                matplotlib_imshow(img_grid, one_channel=True)
-                writer.add_image('train_display', img_grid)
+                tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
 
             if counter % 50 == 0:
                 _, _, iou = get_batch_iou(preds, binimgs)

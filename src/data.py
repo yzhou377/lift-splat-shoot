@@ -15,7 +15,7 @@ from nuscenes.utils.splits import create_splits_scenes
 from nuscenes.utils.data_classes import Box
 from glob import glob
 
-from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx
+from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx, downsize, process_orig_img
 
 
 class NuscData(torch.utils.data.Dataset):
@@ -151,14 +151,13 @@ class NuscData(torch.utils.data.Dataset):
                                                      flip=flip,
                                                      rotate=rotate,
                                                      )
-            
             # for convenience, make augmentation matrices 3x3
             post_tran = torch.zeros(3)
             post_rot = torch.eye(3)
             post_tran[:2] = post_tran2
             post_rot[:2, :2] = post_rot2
             
-            orig_imgs.append(torch.Tensor(np.array(orig_img.resize((352,128)))))
+            orig_imgs.append(process_orig_img(downsize(orig_img,1/8)))
             imgs.append(normalize_img(img)) 
             intrins.append(intrin)
             rots.append(rot)
@@ -243,7 +242,6 @@ class SegmentationData(NuscData):
         binimg = self.get_binimg(rec)
         
         return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg
-
 
 
 
@@ -382,8 +380,9 @@ class CarlaData(torch.utils.data.Dataset):
             post_rot = torch.eye(3)
             post_tran[:2] = post_tran2
             post_rot[:2, :2] = post_rot2
-
-            orig_imgs.append(torch.Tensor(np.array(orig_img.resize((352,128)))))
+            
+            #print(torch.Tensor(np.array(orig_img).T.shape))
+            orig_imgs.append(process_orig_img(downsize(orig_img,1/8)))
             imgs.append(normalize_img(img)) 
             intrins.append(intrin)
             rots.append(rot)
