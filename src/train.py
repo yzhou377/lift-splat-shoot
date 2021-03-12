@@ -5,6 +5,7 @@ Authors: Jonah Philion and Sanja Fidler
 """
 
 import torch
+import torchvision 
 from time import time
 from tensorboardX import SummaryWriter
 import numpy as np
@@ -41,7 +42,7 @@ def train(version,
             zbound=[-10.0, 10.0, 20.0],
             dbound=[4.0, 45.0, 1.0],
 
-            bsz=4,
+            bsz=5,
             nworkers=10,
             lr=1e-3,
             weight_decay=1e-7,
@@ -112,8 +113,9 @@ def train(version,
     model.train()
     counter = 0
     for epoch in range(nepochs):
+        print("Epoch: %10d" % epoch)
         np.random.seed()
-        for batchi, (imgs, rots, trans, intrins, post_rots, post_trans, binimgs) in enumerate(trainloader):
+        for batchi, (orig_imgs, imgs, rots, trans, intrins, post_rots, post_trans, binimgs) in enumerate(trainloader):
             '''
             batchi is the batch id
             imgs are normalized tensor form images of the size: 
@@ -121,7 +123,7 @@ def train(version,
             rots are rotation of the sensor w.r.t. the vehicle center
             trans are translation 
             '''
-            # binimgs is the BEV view map (200*200)
+            # binimgs is the BEV view map (20k0*200)
             # binimgs.shape= torch.Size([4, 1, 200, 200])
             t0 = time()
             opt.zero_grad()
@@ -143,6 +145,13 @@ def train(version,
             if counter % 10 == 0:
                 print(counter, loss.item())
                 writer.add_scalar('train/loss', loss, counter)
+                # Adding the tensorboard image display
+                sampeld_image_data= iter(trainloader)
+                orig_imgs_display, _, _, _, _, _, _, binimgs_display = sampeld_image_data.next()
+                first_image_set= list(torch.unbind(orig_imgs_display[0]))
+                img_grid= torchvision.utils.make_grid(first_image_set)
+                matplotlib_imshow(img_grid, one_channel=True)
+                writer.add_image('train_display', img_grid)
 
             if counter % 50 == 0:
                 _, _, iou = get_batch_iou(preds, binimgs)

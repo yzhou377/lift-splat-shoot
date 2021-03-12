@@ -127,10 +127,13 @@ class NuscData(torch.utils.data.Dataset):
         intrins = []
         post_rots = []
         post_trans = []
+        orig_imgs=[]
+        
         for cam in cams:
             samp = self.nusc.get('sample_data', rec['data'][cam])
             imgname = os.path.join(self.nusc.dataroot, samp['filename'])
             img = Image.open(imgname)
+            orig_img= Image.open(imgname)
             post_rot = torch.eye(2)
             post_tran = torch.zeros(2)
 
@@ -154,7 +157,8 @@ class NuscData(torch.utils.data.Dataset):
             post_rot = torch.eye(3)
             post_tran[:2] = post_tran2
             post_rot[:2, :2] = post_rot2
-
+            
+            orig_imgs.append(torch.Tensor(np.array(orig_img.resize((352,128)))))
             imgs.append(normalize_img(img)) 
             intrins.append(intrin)
             rots.append(rot)
@@ -162,7 +166,7 @@ class NuscData(torch.utils.data.Dataset):
             post_rots.append(post_rot)
             post_trans.append(post_tran)
 
-        return (torch.stack(imgs), torch.stack(rots), torch.stack(trans),
+        return (torch.stack(orig_imgs), torch.stack(imgs), torch.stack(rots), torch.stack(trans),
                 torch.stack(intrins), torch.stack(post_rots), torch.stack(post_trans))
 
     def get_lidar_data(self, rec, nsweeps):
@@ -218,11 +222,11 @@ class VizData(NuscData):
         rec = self.ixes[index]
         
         cams = self.choose_cams()
-        imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
+        orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         lidar_data = self.get_lidar_data(rec, nsweeps=3) # Difference is adding the lidar here. 
         binimg = self.get_binimg(rec)
         
-        return imgs, rots, trans, intrins, post_rots, post_trans, lidar_data, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, lidar_data, binimg
 
 
 class SegmentationData(NuscData):
@@ -235,10 +239,10 @@ class SegmentationData(NuscData):
         print("rec is here")
         print(rec)
         cams = self.choose_cams()
-        imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
+        orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
         
-        return imgs, rots, trans, intrins, post_rots, post_trans, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg
 
 
 
@@ -352,9 +356,11 @@ class CarlaData(torch.utils.data.Dataset):
         intrins = []
         post_rots = []
         post_trans = []
+        orig_imgs=[]
         for cam in cams:
             imgname = os.path.join(rec['folder'], "rgb_{}_{}.jpg".format(cam, rec['in_folder_index']))
             img = Image.open(imgname)
+            orig_img= Image.open(imgname)
             post_rot = torch.eye(2)
             post_tran = torch.zeros(2)
 
@@ -377,6 +383,7 @@ class CarlaData(torch.utils.data.Dataset):
             post_tran[:2] = post_tran2
             post_rot[:2, :2] = post_rot2
 
+            orig_imgs.append(torch.Tensor(np.array(orig_img.resize((352,128)))))
             imgs.append(normalize_img(img)) 
             intrins.append(intrin)
             rots.append(rot)
@@ -384,7 +391,7 @@ class CarlaData(torch.utils.data.Dataset):
             post_rots.append(post_rot)
             post_trans.append(post_tran)
 
-        return (torch.stack(imgs), torch.stack(rots), torch.stack(trans),
+        return (torch.stack(orig_imgs), torch.stack(imgs), torch.stack(rots), torch.stack(trans),
                 torch.stack(intrins), torch.stack(post_rots), torch.stack(post_trans))
 
 
@@ -418,10 +425,10 @@ class CarlaData(torch.utils.data.Dataset):
         rec = self.ixes[index]
         
         cams = self.choose_cams()
-        imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
+        orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
         
-        return imgs, rots, trans, intrins, post_rots, post_trans, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg
 
     def __len__(self):
         return len(self.ixes)
