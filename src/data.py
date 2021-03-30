@@ -33,8 +33,6 @@ class NuscData(torch.utils.data.Dataset):
 
         self.fix_nuscenes_formatting()
 
-        print(self)
-
     def fix_nuscenes_formatting(self):
         """If nuscenes is stored with trainval/1 trainval/2 ... structure, adjust the file paths
         stored in the nuScenes object.
@@ -89,10 +87,6 @@ class NuscData(torch.utils.data.Dataset):
 
         # sort by scene, timestamp (only to make chronological viz easier)
         samples.sort(key=lambda x: (x['scene_token'], x['timestamp']))
-        print("samples_in")
-        print(len(samples))
-        print("samples_end")
-        print(samples[0])
         return samples
     
     def sample_augmentation(self):
@@ -140,6 +134,8 @@ class NuscData(torch.utils.data.Dataset):
             sens = self.nusc.get('calibrated_sensor', samp['calibrated_sensor_token'])
             intrin = torch.Tensor(sens['camera_intrinsic'])
             rot = torch.Tensor(Quaternion(sens['rotation']).rotation_matrix)
+            if cam=='CAM_FRONT':
+                print(intrin)
             tran = torch.Tensor(sens['translation'])
 
             # augmentation (resize, crop, horizontal flip, rotate)
@@ -235,8 +231,6 @@ class SegmentationData(NuscData):
     
     def __getitem__(self, index):
         rec = self.ixes[index]
-        print("rec is here")
-        print(rec)
         cams = self.choose_cams()
         orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
@@ -276,13 +270,13 @@ class CarlaData(torch.utils.data.Dataset):
         data_summary=[]
         if self.is_train:
             start_folder=0
-            end_folder=30
+            end_folder=69
         else:
-            start_folder=30
-            end_folder=50
+            start_folder=70
+            end_folder=99
 
         for folder in sorted(glob(os.path.join(self.dataroot, '0000*')))[start_folder:end_folder]:
-            label_files=glob(os.path.join(folder, 'bev_path_*'))
+            label_files=glob(os.path.join(folder, 'bev_label_*'))
             bev_files= glob(os.path.join(folder, 'rgb_*'))
             for label_file in label_files:
                 in_folder_index= label_file[-10:-4]
@@ -339,6 +333,8 @@ class CarlaData(torch.utils.data.Dataset):
             if cam + '.txt' in extrinsic_filename:
                 extrinsic= np.loadtxt(extrinsic_filename)
                 rot= torch.Tensor(extrinsic[0:3,0:3])
+                # The original calibration file is in LEFT HAND COORDINATES 
+                rot[2,1]*=(-1)
                 tran = torch.Tensor(extrinsic[0:3,3])
                 break 
         return rot, tran 
