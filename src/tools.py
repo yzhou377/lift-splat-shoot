@@ -244,13 +244,24 @@ def get_batch_iou(preds, binimgs):
     """
     with torch.no_grad():
         pred = (preds > 0)
-
         #tgt = binimgs.bool() #ORIGINAL
         # PyTorch >1.3 Compatibility Issue, YZ DEBUG
         tgt= (binimgs>0.5)
-        
+        """
+        num=np.random.randint(0,1000)
+        first_pred_set1= np.array(pred[0].cpu())
+        first_pred_set1=first_pred_set1[0]*255
+        img= Image.fromarray(first_pred_set1, 'L')
+        #img.save('/home/m/{}.png'.format(num))
+
+        first_pred_set2= np.array(tgt[0].cpu())
+        first_pred_set2=first_pred_set2[0]*255
+        img2= Image.fromarray(first_pred_set2, 'L')
+        #img2.save('/home/m/{}.png'.format(num+1)) 
+        """
         intersect = (pred & tgt).sum().float().item()
         union = (pred | tgt).sum().float().item()
+        print(intersect)
     return intersect, union, intersect / union if (union > 0) else 1.0
 
 
@@ -424,6 +435,8 @@ def tensorboard_visualiza(model, writer, dataloader, is_train, device):
     preds = model(imgs.to(device), rots.to(device),
                           trans.to(device), intrins.to(device), post_rots.to(device),
                           post_trans.to(device))
+    preds = (preds > 0)
+    preds = preds*255
     first_pred_set= list(torch.unbind(preds[0]))
     img_grid_pred= torchvision.utils.make_grid(first_pred_set)
     if is_train:

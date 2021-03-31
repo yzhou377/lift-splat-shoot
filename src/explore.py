@@ -12,6 +12,7 @@ mpl.use('Agg') # This specifies that matplotlib only renders to PNG files
 import matplotlib.pyplot as plt
 from PIL import Image # Python image library 
 import matplotlib.patches as mpatches # Patch plots, color blob 
+from tensorboardX import SummaryWriter # The tensorboard writer 
 
 
 # Using .data means to import from this folder 
@@ -20,7 +21,7 @@ import matplotlib.patches as mpatches # Patch plots, color blob
 from .data import compile_data
 from .tools import (ego_to_cam, get_only_in_img_mask, denormalize_img,
                     SimpleLoss, get_val_info, add_ego, gen_dx_bx,
-                    get_nusc_maps, plot_nusc_map)
+                    get_nusc_maps, plot_nusc_map, tensorboard_visualiza)
 from .models import compile_model
 
 
@@ -252,12 +253,17 @@ def eval_model_iou(version,
                                           grid_conf=grid_conf, bsz=bsz, nworkers=nworkers,
                                           parser_name='segmentationdata')
 
-    print(gpuid)
     device = torch.device('cpu') if gpuid < 0 else torch.device(f'cuda:{gpuid}')
     model = compile_model(grid_conf, data_aug_conf, outC=1)
-    print('loading', modelf)
+    print('loading', modelf) 
     model.load_state_dict(torch.load(modelf))
     model.to(device)
+
+    # Visualize the trained output:
+    writer = SummaryWriter(logdir='./runs')
+    tensorboard_visualiza(model= model, writer= writer, dataloader= valloader, is_train=0, device= device)
+
+
 
     loss_fn = SimpleLoss(1.0).cuda(gpuid)
 
