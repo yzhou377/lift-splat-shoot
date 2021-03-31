@@ -42,7 +42,7 @@ def train(version,
             zbound=[-10.0, 10.0, 20.0],
             dbound=[4.0, 45.0, 1.0],
 
-            bsz=5,
+            bsz=6,
             nworkers=10,
             lr=1e-3,
             weight_decay=1e-7,
@@ -51,16 +51,16 @@ def train(version,
     # Differentiating between the CARLA trainer and the Nuscenes trainer here. 
     if version=="CARLA":
         grid_conf = {
-            'xbound': xbound,
-            'ybound': ybound,
+            'xbound': [-25.0, 25.0, 0.25],
+            'ybound': [-25.0, 25.0, 0.25],
             'zbound': zbound,
-            'dbound': dbound,
+            'dbound': [4.0, 25.0, 1.0],
         }
         data_aug_conf = {
                         'resize_lim': resize_lim,
                         'final_dim': final_dim,
                         'rot_lim': rot_lim,
-                        'H': H, 'W': W,
+                        'H': 768, 'W': 1280,
                         'rand_flip': rand_flip,
                         'bot_pct_lim': bot_pct_lim,
                         'cams': ['front_left', 'front', 'front_right',
@@ -103,7 +103,7 @@ def train(version,
     model = compile_model(grid_conf, data_aug_conf, outC=1)
     
     # LOADING CHECK POINT
-    model.load_state_dict(torch.load("/home/m/lift-splat-shoot/runs/model130000.pt"))
+    #model.load_state_dict(torch.load("/home/m/lift-splat-shoot/runs/model130000.pt"))
     
     model.to(device)
 
@@ -112,14 +112,14 @@ def train(version,
     loss_fn = SimpleLoss(pos_weight).cuda(gpuid)
 
     writer = SummaryWriter(logdir=logdir)
-    val_step = 1000 if version == 'mini' else 10000
+    val_step = 1000 
 
     model.train()
     counter = 0
     for epoch in range(nepochs):
         print("Epoch: %10d" % epoch)
         np.random.seed()
-        for batchi, (orig_imgs, imgs, rots, trans, intrins, post_rots, post_trans, binimgs) in enumerate(trainloader):
+        for batchi, (orig_imgs, imgs, rots, trans, intrins, post_rots, post_trans, binimgs, rec) in enumerate(trainloader):
             '''
             batchi is the batch id
             imgs are normalized tensor form images of the size: 
@@ -149,15 +149,16 @@ def train(version,
             if counter % 10 == 0:
                 print(counter, loss.item())
                 writer.add_scalar('train/loss', loss, counter)
-                # Adding the tensorboard image display
-                sampeld_image_data= iter(trainloader)
-                tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
 
             if counter % 50 == 0:
                 _, _, iou = get_batch_iou(preds, binimgs)
                 writer.add_scalar('train/iou', iou, counter)
                 writer.add_scalar('train/epoch', epoch, counter)
                 writer.add_scalar('train/step_time', t1 - t0, counter)
+                # Adding the tensorboard image display
+                sampeld_image_data= iter(trainloader)
+                tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
+
 
             if counter % val_step == 0:
                 val_info = get_val_info(model, valloader, loss_fn, device)

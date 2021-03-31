@@ -263,7 +263,7 @@ def get_val_info(model, valloader, loss_fn, device, use_tqdm=False):
     loader = tqdm(valloader) if use_tqdm else valloader
     with torch.no_grad():
         for batch in loader:
-            allimgs, rots, trans, intrins, post_rots, post_trans, binimgs = batch
+            orig_imgs_display, allimgs, rots, trans, intrins, post_rots, post_trans, binimgs, REC = batch
             preds = model(allimgs.to(device), rots.to(device),
                           trans.to(device), intrins.to(device), post_rots.to(device),
                           post_trans.to(device))
@@ -402,8 +402,8 @@ def downsize(img,rate):
 
 def tensorboard_visualiza(model, writer, dataloader, is_train, device):
     sampeld_image_data= iter(dataloader)
-    orig_imgs_display, imgs, rots, trans, intrins, post_rots, post_trans, binimgs_display = sampeld_image_data.next()
-
+    orig_imgs_display, imgs, rots, trans, intrins, post_rots, post_trans, binimgs_display, rec = sampeld_image_data.next()
+    #print(rec['label'])
     # Display the input image set 
     first_image_set= list(torch.unbind(orig_imgs_display[0]))
     img_grid= torchvision.utils.make_grid(tensor= first_image_set, nrow=int(len(first_image_set)/2))

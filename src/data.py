@@ -14,6 +14,7 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.splits import create_splits_scenes
 from nuscenes.utils.data_classes import Box
 from glob import glob
+import yaml 
 
 from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx, downsize, process_orig_img
 
@@ -134,8 +135,6 @@ class NuscData(torch.utils.data.Dataset):
             sens = self.nusc.get('calibrated_sensor', samp['calibrated_sensor_token'])
             intrin = torch.Tensor(sens['camera_intrinsic'])
             rot = torch.Tensor(Quaternion(sens['rotation']).rotation_matrix)
-            if cam=='CAM_FRONT':
-                print(intrin)
             tran = torch.Tensor(sens['translation'])
 
             # augmentation (resize, crop, horizontal flip, rotate)
@@ -221,7 +220,7 @@ class VizData(NuscData):
         lidar_data = self.get_lidar_data(rec, nsweeps=3) # Difference is adding the lidar here. 
         binimg = self.get_binimg(rec)
         
-        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, lidar_data, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, lidar_data, binimg, rec
 
 
 class SegmentationData(NuscData):
@@ -235,7 +234,7 @@ class SegmentationData(NuscData):
         orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
         
-        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg, rec
 
 
 
@@ -252,6 +251,7 @@ class CarlaData(torch.utils.data.Dataset):
         self.data_aug_conf = data_aug_conf
         self.grid_conf = grid_conf
         self.dataroot= dataroot
+        self.metadata= self.load_metadata()
 
         # Returns a summary of all scenes with splits
         self.ixes= self.prepro()
@@ -259,6 +259,12 @@ class CarlaData(torch.utils.data.Dataset):
         dx, bx, nx = gen_dx_bx(grid_conf['xbound'], grid_conf['ybound'], grid_conf['zbound'])
         self.dx, self.bx, self.nx = dx.numpy(), bx.numpy(), nx.numpy()
         torch.utils.data.Dataset.__init__(dataroot, is_train, data_aug_conf, grid_conf)
+
+    def load_metadata(self):
+        metadata_path= os.path.join(self.dataroot,'000000','metadata.yaml')
+        with open(metadata_path) as file:
+            content= yaml.load(file, Loader=yaml.FullLoader)
+            return content 
 
 
     def prepro(self):
@@ -276,7 +282,7 @@ class CarlaData(torch.utils.data.Dataset):
             end_folder=99
 
         for folder in sorted(glob(os.path.join(self.dataroot, '0000*')))[start_folder:end_folder]:
-            label_files=glob(os.path.join(folder, 'bev_label_*'))
+            label_files=glob(os.path.join(folder, 'bev_label_000*'))
             bev_files= glob(os.path.join(folder, 'rgb_*'))
             for label_file in label_files:
                 in_folder_index= label_file[-10:-4]
@@ -315,11 +321,9 @@ class CarlaData(torch.utils.data.Dataset):
         Return intrinsic matrix of shape 
         Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
         Format confirmed to be in alignment with NuScenes
-        """
-        for intrinsic_filename in glob(os.path.join(self.dataroot,'calibration/intrinsic*')):
-            if cam + '.txt' in intrinsic_filename:
-                intrinsic= np.loadtxt(intrinsic_filename)
-                return torch.Tensor(intrinsic)
+        """ 
+        intrinsic=  np.fromstring(self.metadata['intrinsics'][cam], dtype=np.float, count=9).reshape(3,3)
+        return torch.Tensor(intrinsic)
 
 
     def get_extrinsic(self,cam):
@@ -329,14 +333,10 @@ class CarlaData(torch.utils.data.Dataset):
         Under the dataroot directory, there exists a calibration folder, with 6 extrinsics and 6 intrinsics
         Format confirmed to be in alignment with NuScenes
         """
-        for extrinsic_filename in glob(os.path.join(self.dataroot,'calibration/extrinsic*')):
-            if cam + '.txt' in extrinsic_filename:
-                extrinsic= np.loadtxt(extrinsic_filename)
-                rot= torch.Tensor(extrinsic[0:3,0:3])
-                # The original calibration file is in LEFT HAND COORDINATES 
-                rot[2,1]*=(-1)
-                tran = torch.Tensor(extrinsic[0:3,3])
-                break 
+        extrinsic= np.fromstring(self.metadata['extrinsics'][cam], dtype=np.float, count=12).reshape(3,4)
+        extrinsic[2,1]*=(-1)
+        rot= torch.Tensor(extrinsic[0:3,0:3])
+        tran = torch.Tensor(extrinsic[0:3,3])
         return rot, tran 
 
 
@@ -357,7 +357,6 @@ class CarlaData(torch.utils.data.Dataset):
             orig_img= Image.open(imgname)
             post_rot = torch.eye(2)
             post_tran = torch.zeros(2)
-
             intrin = self.get_intrinsic(cam)
             rot, tran = self.get_extrinsic(cam)
 
@@ -423,7 +422,7 @@ class CarlaData(torch.utils.data.Dataset):
         orig_img, imgs, rots, trans, intrins, post_rots, post_trans = self.get_image_data(rec, cams)
         binimg = self.get_binimg(rec)
         
-        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg
+        return orig_img, imgs, rots, trans, intrins, post_rots, post_trans, binimg, rec
 
     def __len__(self):
         return len(self.ixes)
