@@ -261,7 +261,6 @@ def get_batch_iou(preds, binimgs):
         """
         intersect = (pred & tgt).sum().float().item()
         union = (pred | tgt).sum().float().item()
-        print(intersect)
     return intersect, union, intersect / union if (union > 0) else 1.0
 
 

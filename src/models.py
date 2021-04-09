@@ -127,6 +127,19 @@ class BevEncode(nn.Module):
         return x
 
 
+class keyPointBevEncode(nn.module):
+    """
+    The class focusing on the key point (green/red) point detection,
+    change of representation 
+    """
+    def __init__(self,inC,outC):
+
+    def forward(self,x):
+        """
+        Predicting directly the number of key points and where they are in the BEV domain,
+        normalized to the BEV pixel wise coordinate system. 
+        """
+
 class LiftSplatShoot(nn.Module):
     def __init__(self, grid_conf, data_aug_conf, outC):
         super(LiftSplatShoot, self).__init__()
