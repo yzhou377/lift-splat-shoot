@@ -156,7 +156,6 @@ def train(version,
                 writer.add_scalar('train/epoch', epoch, counter)
                 writer.add_scalar('train/step_time', t1 - t0, counter)
                 # Adding the tensorboard image display
-                sampeld_image_data= iter(trainloader)
                 tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
 
 

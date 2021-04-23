@@ -15,6 +15,7 @@ from nuscenes.utils.splits import create_splits_scenes
 from nuscenes.utils.data_classes import Box
 from glob import glob
 import yaml 
+from sklearn.cluster import KMeans
 
 from .tools import get_lidar_data, img_transform, normalize_img, gen_dx_bx, downsize, process_orig_img
 
@@ -410,6 +411,23 @@ class CarlaData(torch.utils.data.Dataset):
         else:
             cams = self.data_aug_conf['cams']
         return cams
+
+    def get_keypoints(self,rec):
+        keypts_path= os.path.join(rec['folder'], "bev_keypoint_{}.png".format(rec['in_folder_index']))
+        green_value= (0,255,255)
+        red_value= (255,0,255)
+
+        image=Image.open(keypts_path)
+        raw_pixel= np.asarray(image)
+        green_pixels= np.vstack(np.where(np.all(raw_pixel==green_value,axis=-1)==True)) 
+        g_pts= int(green_pixels.shape[1])/65
+        red_pixels= np.vstacknp.where(np.all(raw_pixel==red_value,axis=-1)==True) 
+        r_pts= int(red_pixels.shape[1])/65
+
+        g_fit=KMeans(n_clusters=g_pts, random_state=0).fit(green_pixels.T) 
+        r_fit=KMeans(n_clusters=r_pts, random_state=0).fit(red_pixels.T)
+
+        return g_fit.cluster_centers_, r_fit.cluster_centers_
 
 
     def __getitem__(self, index):
