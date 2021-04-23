@@ -102,10 +102,15 @@ class CarlaData(object):
         #Returning a 14 dimensional vector 
         return np.vstack((center, up_num, up_center, bottom_num, bottom_center, left_num, left_center, right_num, right_center )).reshape(14,)
 
+
     def get_image_data(self, rec):
         """
         Return the image normalized by tools.normalize
         """
+        def downsize(img,rate):
+            img = img.resize((int(img.size[0]*rate),int(img.size[1]*rate)),Image.ANTIALIAS)
+            return  img
+
         input_image = Image.open(rec["input_dir"])
         preprocess = transforms.Compose([
             transforms.Resize(256),
@@ -113,18 +118,18 @@ class CarlaData(object):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
-        input_tensor = preprocess(input_image)
-
-        return input_tensor
+        preprocess_raw= transforms.Compose([transforms.ToTensor()])
+        input_tensor = preprocess(downsize(input_image,1/8))
+        return preprocess_raw(input_image), input_tensor
 
     def __getitem__(self, idx):
         rec = self.ixes[idx]
-        input_tensor = self.get_image_data(rec)
+        input_image, input_tensor = self.get_image_data(rec)
         target_tensor= torch.Tensor(self.get_keypoints(rec))
         #if self.transforms is not None:
         #    img, target = self.transforms(img, target)
 
-        return input_tensor, target_tensor
+        return input_image, input_tensor, target_tensor
 
     def __len__(self):
         return len(self.ixes)
@@ -143,59 +148,36 @@ def compile_data(dataroot, bsz, nworkers):
                                             shuffle=False,
                                             num_workers=nworkers)
     return trainloader, valloader 
-"""
+
 def tensorboard_visualiza(model, writer, dataloader, is_train, device):
     sampeld_image_data= iter(dataloader)
-    img, target= sampeld_image_data.next()
+    input_image, input_tensor, target= sampeld_image_data.next()
     #print(rec['label'])
     # Display the input image set 
     
-    first_image_set= torch.unbind(img[0])
-    first_label= torch.unbind(target[0])
-
-    raw_img= first_image_set
-    
+    first_image= list(torch.unbind(input_image[0]))
+    input_tensor
+    first_label= target[0].numpy()
 
 
-
-
-
-
-
-    img_grid= torchvision.utils.make_grid(tensor= first_image_set, nrow=1)
+    print('Yes')
+    img_grid= torchvision.utils.make_grid(tensor= first_image, nrow=1)
     if is_train:
         writer.add_image('train_input', img_grid)
     else: 
         writer.add_image('val_input',img_grid)
 
-    # Display the GT label:
-    first_label= list(torch.unbind(binimgs_display[0]))
-    img_grid_gt= torchvision.utils.make_grid(first_label)
-    if is_train:
-        writer.add_image('train_gt', img_grid_gt)
-    else: 
-        writer.add_image('val_gt',img_grid_gt)
-
-    # Display the prediction label 
-    preds = model(imgs.to(device), rots.to(device),
-                          trans.to(device), intrins.to(device), post_rots.to(device),
-                          post_trans.to(device))
-    preds = (preds > 0)
-    preds = preds*255
-    first_pred_set= list(torch.unbind(preds[0]))
-    img_grid_pred= torchvision.utils.make_grid(first_pred_set)
-    if is_train:
-        writer.add_image('train_pred', img_grid_pred)
-    else: 
-        writer.add_image('val_pred',img_grid_pred)
-"""
+    # Display GT Label Image
+        #TODO
+    # Display Predict Label Image
+        #TODO
 
 
 if __name__ == '__main__':
 
      # The data preparation
      data_root= "/media/m/377445e5-f724-4791-861c-730d2b0bba3f/carla_map_bev_10k_v2"
-     logdir= "/home/m/lift-splat-shoot/src/image_regression/log"
+     logdir= "/home/m/lift-splat-shoot/src/image_regression/log" 
 
      bsz=6
      nworkers=10            
@@ -220,7 +202,7 @@ if __name__ == '__main__':
 
      model.train()
      for epoch in range(num_epochs):
-         for batch_idx, (data, target) in enumerate(trainloader):
+         for batch_idx, (input_image, data, target) in enumerate(trainloader):
              data, target = data.to(device), target.to(device)
              opt.zero_grad()
              output = model(data)
@@ -233,8 +215,8 @@ if __name__ == '__main__':
                  print(counter, loss.item())
                  writer.add_scalar('train/loss', loss, counter)
 
-             #if counter % 50 == 0:
-                #tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
+             if counter % 1 == 0:
+                tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
 
 
      print("That's it!")
