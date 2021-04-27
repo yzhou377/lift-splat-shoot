@@ -2,7 +2,7 @@ from sklearn.cluster import KMeans
 import numpy as np 
 import torch 
 import torchvision
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import math 
 from torchvision import transforms
 from glob import glob
@@ -152,25 +152,68 @@ def compile_data(dataroot, bsz, nworkers):
 def tensorboard_visualiza(model, writer, dataloader, is_train, device):
     sampeld_image_data= iter(dataloader)
     input_image, input_tensor, target= sampeld_image_data.next()
-    #print(rec['label'])
-    # Display the input image set 
     
-    first_image= list(torch.unbind(input_image[0]))
-    input_tensor
+    image_array= input_image[0]
     first_label= target[0].numpy()
 
+    image = transforms.ToPILImage()(image_array).convert("RGB") 
+    draw= ImageDraw.Draw(image)
+    fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 80)
+    
+    #GT
+    #Center
+    draw.ellipse([(first_label[1]-10,first_label[0]-10),(first_label[1]+10,first_label[0]+10)], fill='blue')
+    #Upper
+    draw.ellipse([(first_label[4]-10,first_label[3]-10),(first_label[4]+10,first_label[3]+10)], fill='red')
+    #Lower
+    draw.ellipse([(first_label[7]-10,first_label[6]-10),(first_label[7]+10,first_label[6]+10)], fill='red')
+    #Left
+    draw.ellipse([(first_label[10]-10,first_label[9]-10),(first_label[10]+10,first_label[9]+10)], fill='black')
+    #Right 
+    draw.ellipse([(first_label[13]-10,first_label[12]-10),(first_label[13]+10,first_label[12]+10)], fill='black')
 
-    print('Yes')
-    img_grid= torchvision.utils.make_grid(tensor= first_image, nrow=1)
+    
+    #Prediction 
+    preds = model(input_image.to(device))
+    first_pred= torch.unbind(preds[0])
+    #Center
+    draw.ellipse([(first_pred[1].item()-10,first_pred[0].item()-10),(first_pred[1].item()+10,first_pred[0].item()+10)], fill='cyan')
+    #Upper
+    draw.ellipse([(first_pred[4].item()-10,first_pred[3].item()-10),(first_pred[4].item()+10,first_pred[3].item()+10)], fill='magenta')
+    #Lower
+    draw.ellipse([(first_pred[7].item()-10,first_pred[6].item()-10),(first_pred[7].item()+10,first_pred[6].item()+10)], fill='magenta')
+    #Left
+    draw.ellipse([(first_pred[10].item()-10,first_pred[9].item()-10),(first_pred[10].item()+10,first_pred[9].item()+10)], fill='gray')
+    #Right 
+    draw.ellipse([(first_pred[13].item()-10,first_pred[12].item()-10),(first_pred[13].item()+10,first_pred[12].item()+10)], fill='gray')
+
+    # GT and Pred Text:
+    # Center
+    if not first_label[0]==0:
+        draw.text([first_label[1],first_label[0]],"center")
+    # Upper
+    if not first_label[3]==0:
+        draw.text([first_label[4],first_label[3]],"top GT:{} PD:{}".format(first_label[2], int(first_pred[2].item())))
+    # Lower 
+    if not first_label[6]==0:
+        draw.text([first_label[7],first_label[6]],"bottom GT:{} PD:{}".format(first_label[5], int(first_pred[5].item())))
+    # left 
+    if not first_label[9]==0:
+        draw.text([first_label[10],first_label[9]],"left GT:{} PD:{}".format(first_label[8], int(first_pred[8].item())))
+    #right
+    if not first_label[12]==0:
+        draw.text([first_label[13],first_label[12]],"right GT:{} PD:{}".format(first_label[11], int(first_pred[11].item())))
+    
+
+
+    #print(np.array(image).shape)
+    #torch.Tensor(np.array(image))
+    img_grid= torchvision.utils.make_grid(tensor=  transforms.ToTensor()(image))
     if is_train:
         writer.add_image('train_input', img_grid)
     else: 
         writer.add_image('val_input',img_grid)
 
-    # Display GT Label Image
-        #TODO
-    # Display Predict Label Image
-        #TODO
 
 
 if __name__ == '__main__':
@@ -179,7 +222,7 @@ if __name__ == '__main__':
      data_root= "/media/m/377445e5-f724-4791-861c-730d2b0bba3f/carla_map_bev_10k_v2"
      logdir= "/home/m/lift-splat-shoot/src/image_regression/log" 
 
-     bsz=6
+     bsz=10
      nworkers=10            
      lr=1e-3
      weight_decay=1e-7
@@ -215,7 +258,7 @@ if __name__ == '__main__':
                  print(counter, loss.item())
                  writer.add_scalar('train/loss', loss, counter)
 
-             if counter % 1 == 0:
+             if counter % 60 == 0:
                 tensorboard_visualiza(model= model, writer= writer, dataloader= trainloader, is_train=1, device= device)
 
 
